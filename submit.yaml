@@ -1,0 +1,49 @@
+description: pretrain_bert_BP_Norm
+# description: pretrain_bert_BP
+
+
+target:
+  service: amlk8s
+  # run "amlt target list amlk8s" to list the names of available AMLK8s targets
+  # name: itpscusv100cl 
+  #name: itpeusp40cl 
+  #name: itplabrl1cl1
+  #name: itpeusp100cl
+  name: itplabrr1cl1
+  
+  #name: itpscusv100cl 
+  #name: itpwus2v100cl
+  # name: itpseasiav100cl 
+  #name: itpeastusv100cl
+  vc: resrchvc
+
+environment:
+  image: zpmiracle/horovod:1.0
+  registry: registry.hub.docker.com # any public registry can be specified here
+  username: vespertinux
+  image_setup:
+   - pip install tqdm
+   - pip install numpy
+  #  - set +u
+  #  - export NCCL_DEBUG=WARN
+
+
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: C:\Users\v-zelinli\Temp\MSRA\Bert-pytorch\bert_pytorch
+
+
+storage:
+    output:
+        storage_account_name: usscv100data
+        container_name: v-zelinli
+        mount_dir: /mnt/output
+
+jobs:
+  - name: run_vanilla
+    sku: G4-V100
+    command:
+      -  python __main__.py -o /mnt/output/bert_trained_Norm.model -v datasets/vocab.txt
+

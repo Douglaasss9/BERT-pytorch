@@ -20,8 +20,19 @@ class BERTDataset(Dataset):
                     self.corpus_lines += 1
 
             if on_memory:
-                self.lines = [line[:-1].split("\t")
-                              for line in tqdm.tqdm(f, desc="Loading Dataset", total=corpus_lines)]
+                self.lines = []
+                for line in tqdm.tqdm(f, desc="Loading Dataset", total=corpus_lines):
+                    t1 = ""
+                    t2 = ""
+                    t = line.split(" ")
+                    for i in range(len(t)):
+                        if i <= len(t) / 2:
+                            t1 += t[i] + " "
+                        else:
+                            t2 += t[i] + " "
+                    self.lines.append([t1, t2])
+                # self.lines = [line[:-1].split("\t")
+                #               for line in tqdm.tqdm(f, desc="Loading Dataset", total=corpus_lines)]
                 self.corpus_lines = len(self.lines)
 
         if not on_memory:
@@ -108,7 +119,14 @@ class BERTDataset(Dataset):
                 self.file = open(self.corpus_path, "r", encoding=self.encoding)
                 line = self.file.__next__()
 
-            t1, t2 = line[:-1].split("\t")
+            t= line[:-1].split(" ")
+            t1 = ""
+            t2 = ""
+            for i in range(len(t)):
+                if i <= len(t) / 2:
+                    t1 += t[i] + " "
+                else:
+                    t2 += t[i] + " "
             return t1, t2
 
     def get_random_line(self):

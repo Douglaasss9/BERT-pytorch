@@ -3,10 +3,11 @@ import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from ..model import BERTLM, BERT
+from model import BERTLM, BERT
 from .optim_schedule import ScheduledOptim
-
+import horovod.torch as hvd
 import tqdm
+import pickle
 
 
 class BERTTrainer:
@@ -55,21 +56,30 @@ class BERTTrainer:
         self.test_data = test_dataloader
 
         # Setting the Adam optimizer with hyper-param
-        self.optim = Adam(self.model.parameters(), lr=lr, betas=betas, weight_decay=weight_decay)
+        optimizer = Adam(self.model.parameters(), lr=lr, betas=betas, weight_decay=weight_decay)
+        
+        self.optim = hvd.DistributedOptimizer(optimizer, named_parameters=self.model.named_parameters())
+        torch.cuda.set_device(hvd.local_rank())
+        hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
         self.optim_schedule = ScheduledOptim(self.optim, self.bert.hidden, n_warmup_steps=warmup_steps)
 
         # Using Negative Log Likelihood Loss function for predicting the masked_token
         self.criterion = nn.NLLLoss(ignore_index=0)
 
         self.log_freq = log_freq
-
+        self.reclog = []
+        self.rectest = []
         print("Total Parameters:", sum([p.nelement() for p in self.model.parameters()]))
 
     def train(self, epoch):
-        self.iteration(epoch, self.train_data)
+        loss, acc = self.iteration(epoch, self.train_data)
+        self.reclog.append([loss, acc])
+
 
     def test(self, epoch):
-        self.iteration(epoch, self.test_data, train=False)
+        print("test:")
+        loss, acc = self.iteration(epoch, self.test_data, train=False)
+        self.rectest.append([loss, acc])
 
     def iteration(self, epoch, data_loader, train=True):
         """
@@ -135,6 +145,7 @@ class BERTTrainer:
 
         print("EP%d_%s, avg_loss=" % (epoch, str_code), avg_loss / len(data_iter), "total_acc=",
               total_correct * 100.0 / total_element)
+        return avg_loss / len(data_iter), total_correct * 100.0 / total_element
 
     def save(self, epoch, file_path="output/bert_trained.model"):
         """
@@ -149,3 +160,13 @@ class BERTTrainer:
         self.bert.to(self.device)
         print("EP:%d Model Saved on:" % epoch, output_path)
         return output_path
+
+    def savelog(self, file_path):
+        outputpathlog = file_path + "log.txt"
+        outputpathtest = file_path + "test.txt"
+        f1 = open(outputpathlog, "wb")
+        f2 = open(outputpathtest, "wb")
+        pickle.dump(self.reclog, f1)
+        pickle.dump(self.rectest, f2)
+        f1.close()
+        f2.close()
