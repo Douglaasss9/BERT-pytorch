@@ -125,3 +125,25 @@ def softmax_Norm(input, dim, normbound):
     softmaxrate = torch.pow(normbound ** 2 * (1.0 / softmaxrate), 0.5)
     input_N = torch.mul(softmaxrate, input)
     return F.softmax(input_N, dim = dim)
+
+
+class Softmax_norm(torch.nn.Module):
+    def __init__(self):
+        super(Softmax_norm, self).__init__()
+        self.normbound = nn.Parameter(torch.randn([1], requires_grad=True) ** 2)
+        self.eps = 1e-5
+
+    def forward(self, input, dim=-1):
+        if dim == -1:
+            dim = len(input.size()) - 1
+        input = input.detach().clone()
+        input = torch.where(torch.isinf(input), torch.full_like(input, 0), input)
+        softmaxrate = torch.var(input, dim=dim).unsqueeze(dim) + self.eps
+        if torch.any(torch.isnan(softmaxrate)):
+            print(torch.any(torch.isnan(input)))
+            softmaxrate = torch.where(torch.isnan(softmaxrate), torch.full_like(softmaxrate, 1), softmaxrate)
+
+        softmaxrate = torch.pow(self.normbound ** 2 * (1.0 / softmaxrate), 0.5)
+
+        input_N = torch.mul(softmaxrate, input)
+        return F.softmax(input_N, dim = dim)
